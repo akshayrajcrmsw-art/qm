@@ -5,6 +5,7 @@ import Chart from "@/components/Chart";
 import Controls from "@/components/Controls";
 import { Candle, YahooMeta } from "@/lib/yahoo";
 import { SRLevel, TrendLine } from "@/lib/supportResistance";
+import { EMAPoint } from "@/lib/indicators";
 import {
   DEFAULT_INTERVAL_LABEL,
   DEFAULT_RANGE_LABEL,
@@ -20,6 +21,8 @@ interface ChartResponse {
   candles: Candle[];
   levels: SRLevel[];
   trendlines: TrendLine[];
+  ema50: EMAPoint[];
+  ema200: EMAPoint[];
   meta: YahooMeta;
   error?: string;
 }
@@ -39,6 +42,8 @@ export default function Page() {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [levels, setLevels] = useState<SRLevel[]>([]);
   const [trendlines, setTrendlines] = useState<TrendLine[]>([]);
+  const [ema50, setEma50] = useState<EMAPoint[]>([]);
+  const [ema200, setEma200] = useState<EMAPoint[]>([]);
   const [meta, setMeta] = useState<YahooMeta | null>(null);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [hover, setHover] = useState<Candle | null>(null);
@@ -80,6 +85,8 @@ export default function Page() {
       setCandles(data.candles);
       setLevels(data.levels);
       setTrendlines(data.trendlines || []);
+      setEma50(data.ema50 || []);
+      setEma200(data.ema200 || []);
       setMeta(data.meta);
       setLivePrice(null);
     } catch (e: any) {
@@ -89,11 +96,32 @@ export default function Page() {
     }
   }, []);
 
+  // Same fetch, but for background refreshes: no loading spinner, and a
+  // failure just keeps the last known-good data instead of showing an error.
+  const refreshChartSilently = useCallback(async (sym: string, range: string, interval: string) => {
+    try {
+      const res = await fetch(
+        `/api/chart?symbol=${encodeURIComponent(sym)}&range=${range}&interval=${interval}`
+      );
+      const data: ChartResponse = await res.json();
+      if (!res.ok || data.error) return;
+      setCandles(data.candles);
+      setLevels(data.levels);
+      setTrendlines(data.trendlines || []);
+      setEma50(data.ema50 || []);
+      setEma200(data.ema200 || []);
+      setMeta((prev) => data.meta ?? prev);
+    } catch {
+      // ignore — next cycle will retry
+    }
+  }, []);
+
   useEffect(() => {
     loadChart(symbol, rangeOpt.range, intervalOpt.value);
   }, [symbol, rangeOpt.range, intervalOpt.value, loadChart]);
 
-  // live polling for the latest traded price
+  // Fast poll: just the latest traded price, used to grow the in-progress
+  // candle smoothly between bar closes.
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
 
@@ -118,6 +146,24 @@ export default function Page() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [symbol, intervalOpt.pollMs]);
+
+  // Slow poll: re-pull the actual candle history so a new bar shows up once
+  // the current one closes (e.g. every 5 minutes on the 5m timeframe),
+  // instead of endlessly stretching whatever the last fetched bar happens to
+  // be. Runs less often than the price poll since it's a heavier request.
+  const chartPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (chartPollRef.current) clearInterval(chartPollRef.current);
+
+    const refreshMs = Math.max(intervalOpt.pollMs * 4, 20000);
+    chartPollRef.current = setInterval(() => {
+      refreshChartSilently(symbol, rangeOpt.range, intervalOpt.value);
+    }, refreshMs);
+
+    return () => {
+      if (chartPollRef.current) clearInterval(chartPollRef.current);
+    };
+  }, [symbol, rangeOpt.range, intervalOpt.value, intervalOpt.pollMs, refreshChartSilently]);
 
   // Merge the live price into the last known candle for display purposes
   // (the chart component does the same merge internally for the plotted bar).
@@ -172,6 +218,7 @@ export default function Page() {
           )}
           <span className="mono currency">{meta?.currency}</span>
           <span className="live-dot" title="Live" />
+          <span className="mono delay-note">via Yahoo Finance — may lag real-time by up to ~15 min</span>
         </div>
 
         {displayCandle && (
@@ -196,6 +243,8 @@ export default function Page() {
             candles={candles}
             levels={levels}
             trendlines={trendlines}
+            ema50={ema50}
+            ema200={ema200}
             currency={meta?.currency || ""}
             livePrice={livePrice}
             onCrosshair={setHover}
@@ -313,6 +362,11 @@ export default function Page() {
           background: var(--up);
           box-shadow: 0 0 0 3px rgba(61, 220, 151, 0.15);
           animation: pulse 1.8s ease-in-out infinite;
+        }
+        .delay-note {
+          font-size: 10px;
+          color: var(--text-faint);
+          margin-left: 4px;
         }
         @keyframes pulse {
           0%, 100% { opacity: 1; }
