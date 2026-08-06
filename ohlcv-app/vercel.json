@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "app/api/chart/route.ts": { "maxDuration": 15 },
-    "app/api/quote/route.ts": { "maxDuration": 10 },
-    "app/api/search/route.ts": { "maxDuration": 10 }
-  }
-}
