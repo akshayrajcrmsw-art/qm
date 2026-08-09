@@ -1,0 +1,70 @@
+:root {
+  --bg: #0a0d12;
+  --bg-panel: #10141b;
+  --bg-panel-raised: #151a23;
+  --border: #212836;
+  --text: #e7e9ee;
+  --text-dim: #7c879b;
+  --text-faint: #4b5568;
+  --up: #3ddc97;
+  --down: #ff5c5c;
+  --accent: #f0a868;
+  --accent-dim: #8a6a45;
+  --focus: #5b8def;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono), monospace;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
